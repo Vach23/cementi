@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Runtime database (schema + seed recreated on boot; data is per-environment)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+
+# Uploaded/generated media (synced via deploy.sh, not git)
+public/foto/
+public/thumbs/
+public/display/
+public/obrazky/articles/
+
+# Secrets
+.env
+
+# Data archives (shipped separately, not via git)
+*.zip
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

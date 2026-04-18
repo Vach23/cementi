@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "pribeh-cementu",
+    "title": "Příběh Cementů",
+    "meta": "",
+    "icon": "",
+    "is_intro": 1,
+    "sort_order": 100
+  },
+  {
+    "slug": "pivnipole",
+    "title": "Stručný úvod do teorie pivního pole",
+    "meta": "Z archivů Cementů",
+    "icon": "/obrazky/dzban.gif",
+    "is_intro": 0,
+    "sort_order": 50
+  },
+  {
+    "slug": "otrava",
+    "title": "Otrava alkoholem",
+    "meta": "Od Pecolda · 12. 6. 2000",
+    "icon": "",
+    "is_intro": 0,
+    "sort_order": 40
+  }
+]
