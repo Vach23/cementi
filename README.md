@@ -64,7 +64,7 @@ At `/admin` (requires admin login):
 ## Deployment (Linux)
 
 ```bash
-./deploy.sh user@host          # deploys to the given target
+./deploy_linux.sh user@host          # deploys to the given target
 ```
 
 The script rsyncs code and photos, installs dependencies, and restarts the PM2 process. The server runs behind nginx on port 3000.

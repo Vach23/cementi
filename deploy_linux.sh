@@ -3,10 +3,10 @@ set -e
 
 # ═══════════════════════════════════════════════════════════
 # Cementi – Deploy to server
-# Usage: ./deploy.sh [user@host]
+# Usage: ./deploy_linux.sh [user@host]
 # ═══════════════════════════════════════════════════════════
 
-SERVER="${1:?Usage: ./deploy.sh user@host}"
+SERVER="${1:?Usage: ./deploy_linux.sh user@host}"
 REMOTE_DIR="/opt/cementi"
 LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 

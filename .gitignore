@@ -7,7 +7,7 @@ data/*.db-shm
 data/*.db-wal
 data/*.db-journal
 
-# Uploaded/generated media (synced via deploy.sh, not git)
+# Uploaded/generated media (synced via deploy_linux.sh, not git)
 public/foto/
 public/thumbs/
 public/display/

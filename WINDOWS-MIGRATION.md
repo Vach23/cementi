@@ -274,7 +274,7 @@ cookie: { maxAge: 30 * 24 * 60 * 60 * 1000, sameSite: 'lax', httpOnly: true, sec
 
 ## 10. Deploying updates
 
-There's no `deploy.sh` on Windows. Updates are done manually:
+There's no `deploy_linux.sh` on Windows. Updates are done manually:
 
 ```powershell
 cd C:\inetpub\cementi
@@ -385,7 +385,7 @@ Log in as admin → `/admin` → in the Uživatelé table, find the `admin` row 
 | Web server | nginx | IIS + ARR |
 | Process manager | PM2 | Windows Service (node-windows) |
 | SSL | Certbot | win-acme or corporate cert |
-| Deploy | `./deploy.sh` (rsync) | `git pull` + restart service |
+| Deploy | `./deploy_linux.sh` (rsync) | `git pull` + restart service |
 | Paths | `/opt/cementi/` | `C:\inetpub\cementi\` |
 | Auto-start | `pm2 startup` | Windows Service (automatic) |
 | Application code | **no changes** | **no changes** |

@@ -24,7 +24,7 @@ cementi/
 ├── server.js                   Entry point: middleware + mount routers + listen (~30 lines)
 ├── generate-thumbnails.js      One-off CLI to regenerate WebP thumbs (admin upload does it inline)
 ├── package.json
-├── deploy.sh                   Reusable deploy script
+├── deploy_linux.sh                   Reusable deploy script
 ├── lib/                        Pure building blocks, one concern per file
 │   ├── db.js                   better-sqlite3 instance + schema (CREATE TABLE IF NOT EXISTS)
 │   ├── helpers.js              Pure: esc, slugify, excerptPlain/Rich, safeFilename/AlbumId, IMAGE_RE, toThumbName
@@ -97,7 +97,7 @@ Four tables:
 
 Comments are attached to a `page_id` — a string the page provides via `<div class="comments-section" data-page="...">`. Examples: `index`, `galerie/2005`, `clanek/pivnipole`.
 
-The schema is created by `deploy.sh` and by `server.js` on boot (`CREATE TABLE IF NOT EXISTS`).
+The schema is created by `deploy_linux.sh` and by `server.js` on boot (`CREATE TABLE IF NOT EXISTS`).
 
 Seeded users (only on a fresh DB):
 - `admin` / `admin` — full admin
@@ -141,7 +141,7 @@ Passwords can be changed via the admin panel (`/admin`) — each user row has an
 ## Deployment
 
 ```bash
-./deploy.sh user@host                 # deploys to the given target
+./deploy_linux.sh user@host                 # deploys to the given target
 ```
 
 The script does:
@@ -166,7 +166,7 @@ Two ways:
 **2. Manual** (bulk):
 - Drop files into `public/foto/YEAR/` locally
 - Run `node generate-thumbnails.js` to produce WebP thumbs
-- `./deploy.sh` syncs only the new files (rsync `--size-only`)
+- `./deploy_linux.sh` syncs only the new files (rsync `--size-only`)
 - On server, thumbnails will be generated if you re-run `generate-thumbnails.js` there too, but since the deploy also uploads local thumbs, it's usually not needed
 
 ## Known issues / TODOs
