@@ -155,6 +155,58 @@ The script does:
 
 The target server is expected to be Ubuntu with Node 20, PM2, and a reverse proxy (e.g. nginx) in front of port 3000. The app lives at `/opt/cementi/` and runs on port 3000 bound to localhost only.
 
+### New server bootstrap (one-time manual setup)
+
+`deploy_linux.sh` handles Node + PM2 + app files, but **nginx and firewall are manual**. On a fresh Ubuntu VPS:
+
+```bash
+# 1. Install nginx + open firewall
+sudo apt update && sudo apt install -y nginx
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# 2. Reverse-proxy config — replaces the default welcome page
+sudo tee /etc/nginx/sites-available/cementi > /dev/null <<'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name cementi.cz www.cementi.cz _;
+
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+
+sudo ln -sf /etc/nginx/sites-available/cementi /etc/nginx/sites-enabled/cementi
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+
+# 3. Deploy (installs Node, PM2, app files, starts the service)
+./deploy_linux.sh ubuntu@<new-ip>
+
+# 4. HTTPS — only after DNS A record points to this server
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d cementi.cz -d www.cementi.cz
+
+# 5. After HTTPS works, enable secure cookie in server.js:
+#    cookie: { ..., secure: true }
+# then redeploy.
+```
+
+**Why these nginx settings matter:**
+- `client_max_body_size 100M` — without this, photo uploads over ~1 MB are rejected before reaching Node
+- `server_name cementi.cz www.cementi.cz _` — matches both the domain and IP-based access
+- `default_server` on `listen 80` — catches requests to the raw IP too
+- Removing `/etc/nginx/sites-enabled/default` prevents the "Welcome to nginx" page from shadowing the app
+
 ## Adding photos
 
 Two ways:
