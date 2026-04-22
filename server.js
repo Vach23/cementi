@@ -12,6 +12,8 @@ var articlesLib = require('./lib/articles');
 var app = express();
 var PORT = process.env.PORT || 3000;
 
+app.set('trust proxy', 1);
+
 articlesLib.seedArticles();
 
 app.use(compression());
@@ -25,7 +27,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000, sameSite: 'lax', httpOnly: true }
+    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000, sameSite: 'lax', httpOnly: true, secure: true }
 }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '7d' }));
 
