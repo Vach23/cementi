@@ -31,6 +31,11 @@ var getArticles = articlesLib.getArticles;
 
 var router = express.Router();
 
+function albumSubtitle(album) {
+    var meta = albumMeta[album.id] || {};
+    return album.subtitle || meta.subtitle || '';
+}
+
 router.get('/', function (req, res) {
     var albums = getAlbums();
     var yearAlbums = albums.filter(function (a) { return /^\d{4}$/.test(a.id) && getPhotos(a.id).length > 0; });
@@ -86,7 +91,7 @@ router.get('/', function (req, res) {
                 ${yearAlbums.map(function (a) {
                     var count = getPhotos(a.id).length;
                     var cover = getCoverPhoto(a);
-                    var sub = (albumMeta[a.id] && albumMeta[a.id].subtitle) || '';
+                    var sub = albumSubtitle(a);
                     return `<a href="/galerie/${a.id}" class="board-card">
                         <div class="board-card-img" style="background-image:url('${cover}')">
                             <span class="board-card-count">${count}</span>
@@ -144,7 +149,7 @@ router.get('/cas', function (req, res) {
     var timelineHtml = yearAlbums.map(function (a) {
         var photos = getPhotos(a.id);
         var cover = getCoverPhoto(a);
-        var meta = albumMeta[a.id] || {};
+        var sub = albumSubtitle(a);
         var thumbSet = getThumbSet(a.id);
         var previewPhotos = photos.slice(0, 4).map(function (f) { return thumbPath(a.id, f, thumbSet); });
 
@@ -154,7 +159,7 @@ router.get('/cas', function (req, res) {
                 <div class="tl-card-cover" style="background-image:url('${cover}')"></div>
                 <div class="tl-card-body">
                     <h3>${esc(a.title)}</h3>
-                    ${meta.subtitle ? '<p class="tl-card-sub">' + esc(meta.subtitle) + '</p>' : ''}
+                    ${sub ? '<p class="tl-card-sub">' + esc(sub) + '</p>' : ''}
                     <p class="tl-card-count">${photoCountText(photos.length)}</p>
                     <div class="tl-card-previews">
                         ${previewPhotos.map(function (src) {
@@ -169,11 +174,11 @@ router.get('/cas', function (req, res) {
     var specialHtml = specialAlbums.map(function (a) {
         var count = getPhotos(a.id).length;
         var cover = getCoverPhoto(a);
-        var meta = albumMeta[a.id] || {};
+        var sub = albumSubtitle(a);
         return `<a href="/galerie/${a.id}" class="special-album-card">
             <div class="special-album-cover" style="background-image:url('${cover}')"></div>
             <div class="special-album-body">
-                <h3>${esc(meta.subtitle || a.title)}</h3>
+                <h3>${esc(sub || a.title)}</h3>
                 <span>${photoCountText(count)}</span>
             </div>
         </a>`;
@@ -217,7 +222,7 @@ router.get('/galerie/:album', function (req, res) {
 
     var photos = getPhotos(albumId);
     var videos = getVideos(albumId);
-    var meta = albumMeta[albumId] || {};
+    var subtitle = albumSubtitle(album);
 
     var page = parseInt(req.query.s) || 1;
     var perPage = 36;
@@ -252,7 +257,7 @@ router.get('/galerie/:album', function (req, res) {
         <div class="gallery-header-overlay"></div>
         <div class="gallery-header-content">
             <h1>${esc(album.title)}</h1>
-            ${meta.subtitle ? '<p>' + esc(meta.subtitle) + '</p>' : ''}
+            ${subtitle ? '<p>' + esc(subtitle) + '</p>' : ''}
             <span class="gallery-stat">${photoCountText(photos.length)}${videos.length ? ' · ' + videos.length + ' videí' : ''}</span>
         </div>
     </section>

@@ -50,6 +50,7 @@ var getAlbums = albumsLib.getAlbums;
 var invalidateSync = albumsLib.invalidateSync;
 var getArticle = articlesLib.getArticle;
 var getArticles = articlesLib.getArticles;
+var albumMeta = photosLib.albumMeta;
 
 // Albums whose deletion would break the public site. Photos inside can still be managed normally.
 var PROTECTED_ALBUMS = { 'titulni_strana': true };
@@ -67,6 +68,11 @@ var SANITIZE_OPTS = {
 
 function sanitizeArticleHtml(html) {
     return sanitizeHtml(html, SANITIZE_OPTS);
+}
+
+function albumSubtitle(album) {
+    var meta = albumMeta[album.id] || {};
+    return album.subtitle || meta.subtitle || '';
 }
 
 // ── Upload storage (photos) ────────────────────────────────
@@ -154,10 +160,11 @@ router.get('/', requireAdminPage, function (req, res) {
     var systemAlbums = albums.filter(function (a) { return PROTECTED_ALBUMS[a.id]; });
 
     function albumRow(a) {
+        var subtitle = albumSubtitle(a);
         return '<tr>'
             + '<td data-label="ID"><a href="/galerie/' + esc(a.id) + '">' + esc(a.id) + '</a></td>'
             + '<td data-label="Název">' + esc(a.title) + '</td>'
-            + '<td data-label="Místo">' + esc(a.subtitle) + '</td>'
+            + '<td data-label="Místo">' + esc(subtitle) + '</td>'
             + '<td data-label="Fotek">' + photoCounts[a.id] + '</td>'
             + '<td data-label="Akce" class="admin-actions">'
             + '<a href="/admin/album/' + esc(a.id) + '" class="btn-sm">Upravit</a>'
@@ -321,12 +328,17 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
     var thumbSet = getThumbSet(albumId);
     var isProtected = !!PROTECTED_ALBUMS[albumId];
     var isLandingPhotos = albumId === 'titulni_strana';
+    var subtitle = albumSubtitle(album);
+    var summaryParts = [];
+    if (subtitle) summaryParts.push(subtitle);
+    summaryParts.push(helpers.photoCountText(photos.length));
+    if (videos.length) summaryParts.push(videos.length + ' videí');
     var body = `
     <section class="page-header">
         <div class="container">
             <p class="page-header-crumb"><a href="/admin">← zpět na admin</a></p>
             <h1>Album: ${esc(album.title)}</h1>
-            <p>${esc(album.subtitle || '')} · ${helpers.photoCountText(photos.length)}${videos.length ? ' · ' + videos.length + ' videí' : ''}</p>
+            <p>${esc(summaryParts.join(' · '))}</p>
             ${isLandingPhotos ? '<p class="page-header-note">Fotky v tomto albu se zobrazují na <strong>domovské stránce</strong> – v úvodním slideshow a jako náhledy u příběhu (první čtyři).</p>' : ''}
         </div>
     </section>
@@ -340,7 +352,7 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
                     <label>Název</label>
                     <input name="title" value="${esc(album.title)}" required />
                     <label>Místo / podtitulek</label>
-                    <input name="subtitle" value="${esc(album.subtitle)}" />
+                    <input name="subtitle" value="${esc(subtitle)}" />
                     <label>Pořadí <span class="form-hint">(vyšší číslo = dřív)</span></label>
                     <input name="sort_order" type="number" value="${album.sort_order}" />
                     <div>

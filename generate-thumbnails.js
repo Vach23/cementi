@@ -1,6 +1,6 @@
-// One-off script: generates WebP thumbnails (400x300) for all photos.
+// One-off script: generates missing WebP thumbnails and display copies for all photos.
 // Run: node generate-thumbnails.js
-// Safe to re-run — skips files that already have a thumbnail.
+// Safe to re-run: skips files whose derived assets already exist.
 
 var path = require('path');
 var fs = require('fs');
@@ -9,47 +9,64 @@ var photosLib = require('./lib/photos');
 
 var FOTO_DIR = photosLib.FOTO_DIR;
 var THUMB_DIR = photosLib.THUMB_DIR;
+var DISPLAY_DIR = photosLib.DISPLAY_DIR;
 
-async function generate() {
-    var albums;
+function albumDirs() {
     try {
-        albums = fs.readdirSync(FOTO_DIR).filter(function (d) {
+        return fs.readdirSync(FOTO_DIR).filter(function (d) {
             try { return fs.statSync(path.join(FOTO_DIR, d)).isDirectory(); }
             catch (e) { return false; }
         });
     } catch (e) {
         console.error('Cannot read', FOTO_DIR, e.message);
-        return;
+        return [];
     }
+}
+
+function albumPhotos(albumId) {
+    try {
+        return fs.readdirSync(path.join(FOTO_DIR, albumId)).filter(function (f) {
+            return helpers.IMAGE_RE.test(f);
+        });
+    } catch (e) {
+        return [];
+    }
+}
+
+async function generate() {
+    var albums = albumDirs();
 
     var total = 0;
-    var created = 0;
+    var thumbs = 0;
+    var displays = 0;
+    var errors = 0;
 
     for (var a of albums) {
-        var photos;
-        try {
-            photos = fs.readdirSync(path.join(FOTO_DIR, a)).filter(function (f) {
-                return helpers.IMAGE_RE.test(f);
-            });
-        } catch (e) { continue; }
-
-        for (var photo of photos) {
+        for (var photo of albumPhotos(a)) {
             total++;
-            var dest = path.join(THUMB_DIR, a, helpers.toThumbName(photo));
-            if (fs.existsSync(dest)) continue;
+            var webp = helpers.toThumbName(photo);
 
             try {
-                await photosLib.generateThumb(a, photo);
-                created++;
-                if (created % 50 === 0) console.log('  ... ' + created + ' thumbnails created');
+                if (!fs.existsSync(path.join(THUMB_DIR, a, webp))) {
+                    await photosLib.generateThumb(a, photo);
+                    thumbs++;
+                }
+                if (!fs.existsSync(path.join(DISPLAY_DIR, a, webp))) {
+                    await photosLib.generateDisplay(a, photo);
+                    displays++;
+                }
+                if ((thumbs + displays) > 0 && (thumbs + displays) % 50 === 0) {
+                    console.log('  ... ' + thumbs + ' thumbnails, ' + displays + ' display copies created');
+                }
             } catch (e) {
-                console.error('  Error: ' + photo + ' — ' + e.message);
+                errors++;
+                console.error('  Error: ' + a + '/' + photo + ' - ' + e.message);
             }
         }
     }
 
-    console.log('Done! ' + created + ' new thumbnails (' + total + ' total photos)');
+    console.log('Done! ' + thumbs + ' new thumbnails, ' + displays + ' new display copies (' + total + ' total photos, ' + errors + ' errors)');
 }
 
-console.log('Generating thumbnails...');
+console.log('Generating photo assets...');
 generate();

@@ -4,7 +4,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "thumbnails": "node generate-thumbnails.js"
+    "photo-assets": "node generate-thumbnails.js"
   },
   "description": "Cementárna – VUT Brno 1988 reunion website",
   "dependencies": {
