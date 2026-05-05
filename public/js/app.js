@@ -4,6 +4,9 @@
    ═══════════════════════════════════════════════════════════ */
 
 (function () {
+    var lastModalTrigger = null;
+    var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // ── Scroll effects ────────────────────────────────────
     var nav = document.getElementById('main-nav');
     if (document.body.classList.contains('page-home') && nav) {
@@ -12,11 +15,96 @@
         });
     }
 
-    // ── Login ─────────────────────────────────────────────
-    window.handleLogin = function (e) {
+    // ── Navigation + modal ────────────────────────────────
+    function initNav() {
+        var toggle = document.querySelector('[data-nav-toggle]');
+        var links = document.getElementById('nav-links');
+        var auth = document.getElementById('nav-auth');
+        if (toggle && links && auth) {
+            toggle.addEventListener('click', function () {
+                var open = !links.classList.contains('open');
+                links.classList.toggle('open', open);
+                auth.classList.toggle('open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                toggle.setAttribute('aria-label', open ? 'Zavřít menu' : 'Otevřít menu');
+            });
+        }
+
+        document.querySelectorAll('[data-open-modal]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                openModal(btn.getAttribute('data-open-modal'), btn);
+            });
+        });
+
+        document.querySelectorAll('[data-logout]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                fetch('/api/logout', { method: 'POST' }).then(function () { location.reload(); });
+            });
+        });
+    }
+
+    function openModal(id, trigger) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        lastModalTrigger = trigger || document.activeElement;
+        modal.hidden = false;
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        var focusTarget = modal.querySelector('input, button, textarea, select, a[href]');
+        if (focusTarget) focusTarget.focus();
+    }
+
+    function closeModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('active');
+        modal.hidden = true;
+        document.body.style.overflow = '';
+        if (lastModalTrigger && typeof lastModalTrigger.focus === 'function') lastModalTrigger.focus();
+    }
+
+    function initModals() {
+        document.querySelectorAll('.modal').forEach(function (modal) {
+            modal.querySelectorAll('[data-close-modal]').forEach(function (btn) {
+                btn.addEventListener('click', function () { closeModal(modal); });
+            });
+        });
+
+        document.addEventListener('keydown', function (e) {
+            var modal = document.querySelector('.modal.active');
+            if (!modal) return;
+            if (e.key === 'Escape') {
+                closeModal(modal);
+                return;
+            }
+            if (e.key !== 'Tab') return;
+
+            var focusable = modal.querySelectorAll('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
+            if (!focusable.length) return;
+            var first = focusable[0];
+            var last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+    }
+
+    function initLogin() {
+        var form = document.getElementById('login-form');
+        if (!form) return;
+        form.addEventListener('submit', handleLogin);
+    }
+
+    function handleLogin(e) {
         e.preventDefault();
         var form = e.target;
         var errEl = document.getElementById('login-error');
+        if (errEl) errEl.textContent = '';
         fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -26,9 +114,110 @@
             .then(function (d) {
                 if (d.user) location.reload();
                 else if (errEl) errEl.textContent = d.error || 'Chyba přihlášení';
+            })
+            .catch(function () {
+                if (errEl) errEl.textContent = 'Chyba připojení';
             });
         return false;
-    };
+    }
+
+    function initConfirmForms() {
+        document.querySelectorAll('form[data-confirm-id]').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                var expected = form.getAttribute('data-confirm-id');
+                var typed = prompt('Pro potvrzení napiš ID "' + expected + '":');
+                if (typed !== expected) e.preventDefault();
+            });
+        });
+
+        document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                if (!confirm(form.getAttribute('data-confirm'))) e.preventDefault();
+            });
+        });
+    }
+
+    function initHeroSlideshow() {
+        var container = document.getElementById('hero-slideshow');
+        if (!container) return;
+        var allUrls;
+        try { allUrls = JSON.parse(container.getAttribute('data-slides')); } catch (e) { return; }
+        if (!allUrls || allUrls.length < 2) return;
+        if (prefersReducedMotion) return;
+
+        var slides = [container.querySelector('.hero-slide')];
+        var overlay = container.querySelector('.hero-overlay');
+        var idx = 0;
+        var preloaded = {};
+        preloaded[allUrls[0]] = true;
+
+        function preloadNext(nextIdx) {
+            var url = allUrls[nextIdx];
+            if (preloaded[url]) return;
+            var img = new Image();
+            img.src = url;
+            preloaded[url] = true;
+        }
+
+        function getOrCreateSlide(i) {
+            var url = allUrls[i];
+            for (var s = 0; s < slides.length; s++) {
+                if (slides[s].src.indexOf(url.split('/').pop()) >= 0) return slides[s];
+            }
+            var el = document.createElement('img');
+            el.className = 'hero-slide';
+            el.alt = '';
+            el.src = url;
+            container.insertBefore(el, overlay);
+            slides.push(el);
+            return el;
+        }
+
+        preloadNext(1);
+        setInterval(function () {
+            var cur = getOrCreateSlide(idx);
+            cur.classList.remove('active');
+            idx = (idx + 1) % allUrls.length;
+            preloadNext((idx + 1) % allUrls.length);
+            var next = getOrCreateSlide(idx);
+            next.classList.add('active');
+        }, 4000);
+    }
+
+    function initStoryPhotos() {
+        var container = document.querySelector('.story-photos[data-photos]');
+        if (!container) return;
+        var pool;
+        try { pool = JSON.parse(container.getAttribute('data-photos')); } catch (e) { return; }
+        if (!pool || pool.length === 0) return;
+        var slots = container.querySelectorAll('img');
+
+        slots.forEach(function (img) {
+            img.style.cursor = 'pointer';
+            img.addEventListener('click', function (e) {
+                e.preventDefault();
+                var i = parseInt(img.getAttribute('data-photo-index')) || 0;
+                if (window.openLightbox) window.openLightbox(i, pool);
+            });
+        });
+
+        if (prefersReducedMotion || pool.length <= slots.length) return;
+        var nextPoolIdx = slots.length;
+        var slotToReplace = 0;
+        setInterval(function () {
+            if (nextPoolIdx >= pool.length) nextPoolIdx = 0;
+            var slot = slots[slotToReplace];
+            var newSrc = pool[nextPoolIdx];
+            slot.style.opacity = '0';
+            setTimeout(function () {
+                slot.src = newSrc;
+                slot.setAttribute('data-photo-index', nextPoolIdx);
+                slot.style.opacity = '1';
+            }, 600);
+            nextPoolIdx++;
+            slotToReplace = (slotToReplace + 1) % slots.length;
+        }, 6000);
+    }
 
     // ── Lightbox ──────────────────────────────────────────
     var defaultImages = [];      // collected at init from [data-full] elements
@@ -39,11 +228,14 @@
     function initLightbox() {
         lightbox = document.createElement('div');
         lightbox.className = 'lightbox';
+        lightbox.setAttribute('role', 'dialog');
+        lightbox.setAttribute('aria-modal', 'true');
+        lightbox.setAttribute('aria-label', 'Prohlížeč fotek');
         lightbox.innerHTML =
-            '<span class="lb-close">&times;</span>' +
-            '<span class="lb-nav lb-prev">&#8249;</span>' +
+            '<button type="button" class="lb-close" aria-label="Zavřít fotku">&times;</button>' +
+            '<button type="button" class="lb-nav lb-prev" aria-label="Předchozí fotka">&#8249;</button>' +
             '<img src="" alt="" />' +
-            '<span class="lb-nav lb-next">&#8250;</span>' +
+            '<button type="button" class="lb-nav lb-next" aria-label="Další fotka">&#8250;</button>' +
             '<span class="lb-counter"></span>';
         document.body.appendChild(lightbox);
 
@@ -86,6 +278,7 @@
         currentIdx = idx;
         showImg();
         lightbox.classList.add('active');
+        lightbox.querySelector('.lb-close').focus();
         document.body.style.overflow = 'hidden';
     }
     window.openLightbox = openLightbox;
@@ -199,7 +392,13 @@
 
     // ── Init ──────────────────────────────────────────────
     function init() {
+        initNav();
+        initModals();
+        initLogin();
+        initConfirmForms();
         initLightbox();
+        initHeroSlideshow();
+        initStoryPhotos();
         initComments();
     }
 

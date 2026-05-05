@@ -27,6 +27,14 @@ var confirmDeleteForm = layoutLib.confirmDeleteForm;
 var requireAdminPage = layoutLib.requireAdminPage;
 var requireAdmin = auth.requireAdmin;
 
+function adminLayout(title, body, req, opts) {
+    opts = opts || {};
+    var merged = {};
+    Object.keys(opts).forEach(function (k) { merged[k] = opts[k]; });
+    merged.stylesheets = (opts.stylesheets || []).concat('/css/admin.css');
+    return layout(title, body, req, merged);
+}
+
 var FOTO_DIR = photosLib.FOTO_DIR;
 var THUMB_DIR = photosLib.THUMB_DIR;
 var DISPLAY_DIR = photosLib.DISPLAY_DIR;
@@ -271,7 +279,7 @@ router.get('/', requireAdminPage, function (req, res) {
             </div>
         </div>
     </section>`;
-    res.send(layout('Admin', body, req));
+    res.send(adminLayout('Admin', body, req));
 });
 
 // ── Albums: create + edit + editor page ────────────────────
@@ -304,7 +312,7 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
     var albumId = req.params.id;
     var album = db.prepare('SELECT * FROM albums WHERE id = ?').get(albumId);
     if (!album) {
-        return res.status(404).send(layout('Nenalezeno',
+        return res.status(404).send(adminLayout('Nenalezeno',
             '<section class="page-header"><div class="container"><h1>Album nenalezeno</h1></div></section>' +
             '<section class="section"><div class="container"><p><a href="/admin">← zpět na admin</a></p></div></section>', req));
     }
@@ -348,7 +356,7 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
                     <input type="file" name="photos" id="album-upload-files" multiple accept="image/jpeg,image/png,image/gif,image/webp,video/mp4" required />
                     <button type="submit" class="btn btn-primary" id="album-upload-btn">Nahrát</button>
                 </form>
-                <div id="album-upload-progress" class="upload-progress" style="display:none">
+                <div id="album-upload-progress" class="upload-progress" hidden>
                     <div class="upload-progress-bar"><div class="upload-progress-fill" id="album-progress-fill"></div></div>
                     <p class="upload-progress-text" id="album-progress-text"></p>
                 </div>
@@ -366,10 +374,10 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
                             + '<div class="admin-photo-actions">'
                             + '<form method="POST" action="/admin/album/' + esc(albumId) + '/cover" class="inline-form">'
                             + '<input type="hidden" name="filename" value="' + esc(f) + '" />'
-                            + '<button title="Nastavit jako titulní fotku" class="admin-photo-btn">★</button></form>'
+                            + '<button title="Nastavit jako titulní fotku" aria-label="Nastavit jako titulní fotku" class="admin-photo-btn">★</button></form>'
                             + confirmDeleteForm('/admin/album/' + esc(albumId) + '/photo/delete',
                                 'fotku ' + f,
-                                '<button title="Smazat fotku" class="admin-photo-btn admin-photo-btn-danger">×</button>',
+                                '<button title="Smazat fotku" aria-label="Smazat fotku" class="admin-photo-btn admin-photo-btn-danger">×</button>',
                                 { filename: f })
                             + '</div>'
                             + '<span class="admin-photo-name">' + esc(f) + '</span>'
@@ -401,8 +409,7 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
             <div class="admin-section admin-danger">
                 <div class="admin-section-header"><h2>Nebezpečná zóna</h2></div>
                 <p>Smazáním alba se nevratně odstraní všechny fotky, videa i jejich náhledy z disku i z databáze.</p>
-                <form method="POST" action="/admin/album/${esc(albumId)}/delete"
-                      onsubmit="var r = prompt('Pro potvrzení napiš ID alba &quot;${esc(albumId)}&quot;:'); return r === '${esc(albumId)}';">
+                <form method="POST" action="/admin/album/${esc(albumId)}/delete" data-confirm-id="${esc(albumId)}">
                     <button class="btn btn-danger">Smazat celé album</button>
                 </form>
             </div>`}
@@ -410,134 +417,8 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
         </div>
     </section>
 
-    <script>
-    (function () {
-        var form = document.getElementById('album-upload-form');
-        if (!form) return;
-        var progressWrap = document.getElementById('album-upload-progress');
-        var progressFill = document.getElementById('album-progress-fill');
-        var progressText = document.getElementById('album-progress-text');
-        var uploadBtn = document.getElementById('album-upload-btn');
-
-        var MAX_DIM = 4000;  // max dimension for client-side resize
-        var QUALITY = 0.90;  // JPEG quality after resize
-        var WARN_MB = 15;    // warn if a file is still this big after resize
-
-        // Client-side resize: returns a Promise<Blob> (JPEG).
-        // Videos and small images pass through unchanged.
-        function resizeImage(file) {
-            return new Promise(function (resolve) {
-                if (file.type.indexOf('image/') !== 0) return resolve(file);
-                if (file.size < 500 * 1024) return resolve(file); // <500 KB — skip resize
-
-                var img = new Image();
-                var url = URL.createObjectURL(file);
-                img.onload = function () {
-                    URL.revokeObjectURL(url);
-                    var w = img.naturalWidth, h = img.naturalHeight;
-                    if (w <= MAX_DIM && h <= MAX_DIM) return resolve(file); // already small enough
-
-                    var scale = Math.min(MAX_DIM / w, MAX_DIM / h);
-                    var nw = Math.round(w * scale), nh = Math.round(h * scale);
-
-                    var canvas = document.createElement('canvas');
-                    canvas.width = nw;
-                    canvas.height = nh;
-                    canvas.getContext('2d').drawImage(img, 0, 0, nw, nh);
-
-                    canvas.toBlob(function (blob) {
-                        // Preserve original filename with .jpg extension
-                        var name = file.name.replace(/\.[^.]+$/, '.jpg');
-                        resolve(new File([blob], name, { type: 'image/jpeg' }));
-                    }, 'image/jpeg', QUALITY);
-                };
-                img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
-                img.src = url;
-            });
-        }
-
-        form.onsubmit = function (e) {
-            e.preventDefault();
-            var rawFiles = Array.from(document.getElementById('album-upload-files').files);
-            if (!rawFiles.length) return;
-
-            uploadBtn.disabled = true;
-            progressWrap.style.display = '';
-            progressFill.style.width = '0%';
-
-            var originalMB = rawFiles.reduce(function (s, f) { return s + f.size; }, 0) / (1024 * 1024);
-            progressText.textContent = 'Komprimuju ' + rawFiles.length + ' souborů (' + originalMB.toFixed(1) + ' MB)…';
-
-            // Phase 1: client-side resize all images
-            Promise.all(rawFiles.map(resizeImage)).then(function (resized) {
-                var fd = new FormData();
-                var warnings = [];
-                var compressedMB = 0;
-
-                resized.forEach(function (f) {
-                    fd.append('photos', f);
-                    compressedMB += f.size;
-                    if (f.size > WARN_MB * 1024 * 1024) {
-                        warnings.push(f.name + ' (' + (f.size / (1024 * 1024)).toFixed(1) + ' MB)');
-                    }
-                });
-                compressedMB = compressedMB / (1024 * 1024);
-
-                var savedPct = originalMB > 0 ? Math.round((1 - compressedMB / originalMB) * 100) : 0;
-                var sizeNote = compressedMB.toFixed(1) + ' MB';
-                if (savedPct > 5) sizeNote += ' (ušetřeno ' + savedPct + '%)';
-
-                if (warnings.length) {
-                    var ok = confirm('Tyto soubory jsou i po kompresi velké:\\n\\n' + warnings.join('\\n') + '\\n\\nPokračovat v nahrávání?');
-                    if (!ok) { uploadBtn.disabled = false; progressWrap.style.display = 'none'; return; }
-                }
-
-                progressText.textContent = 'Nahrávám ' + resized.length + ' souborů (' + sizeNote + ')…';
-
-                // Phase 2: upload with progress
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', form.action);
-                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-
-                xhr.upload.addEventListener('progress', function (ev) {
-                    if (!ev.lengthComputable) return;
-                    var pct = Math.round((ev.loaded / ev.total) * 100);
-                    progressFill.style.width = pct + '%';
-                    var loadedMB = (ev.loaded / (1024 * 1024)).toFixed(1);
-                    progressText.textContent = 'Nahrávám… ' + pct + '% (' + loadedMB + ' / ' + compressedMB.toFixed(1) + ' MB)';
-                });
-
-                xhr.addEventListener('load', function () {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        progressFill.style.width = '100%';
-                        progressFill.classList.add('done');
-                        try {
-                            var d = JSON.parse(xhr.responseText);
-                            progressText.textContent = (d.message || 'Hotovo!') + ' Obnovuji stránku…';
-                        } catch (err) {
-                            progressText.textContent = 'Hotovo! Obnovuji stránku…';
-                        }
-                        setTimeout(function () { location.reload(); }, 800);
-                    } else {
-                        progressFill.classList.add('error');
-                        progressText.textContent = 'Chyba při nahrávání (HTTP ' + xhr.status + ')';
-                        uploadBtn.disabled = false;
-                    }
-                });
-
-                xhr.addEventListener('error', function () {
-                    progressFill.classList.add('error');
-                    progressText.textContent = 'Chyba připojení — zkus to znovu.';
-                    uploadBtn.disabled = false;
-                });
-
-                xhr.send(fd);
-            });
-        };
-    })();
-    </script>
     `;
-    res.send(layout('Album – ' + album.title, body, req));
+    res.send(adminLayout('Album – ' + album.title, body, req, { scripts: ['/js/admin.js'] }));
 });
 
 function wantsJson(req) {
@@ -547,7 +428,7 @@ function wantsJson(req) {
 
 function finishUpload(req, res, albumId, status, message) {
     if (wantsJson(req)) return res.status(status).json(status >= 400 ? { error: message } : { message: message });
-    if (status >= 400) return res.status(status).send(layout('Chyba při nahrávání',
+    if (status >= 400) return res.status(status).send(adminLayout('Chyba při nahrávání',
         '<section class="section"><div class="container"><p>' + esc(message) + '</p><p><a href="/admin/album/' + esc(albumId) + '">Zpět na album</a></p></div></section>', req));
     res.redirect('/admin/album/' + albumId);
 }
@@ -669,7 +550,6 @@ function renderArticleForm(article) {
            </div>`
         : '';
     return `
-    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
     <section class="page-header"><div class="container"><h1>${isNew ? 'Nový článek' : 'Upravit článek'}</h1></div></section>
     <section class="section">
         <div class="container container-narrow">
@@ -687,7 +567,7 @@ function renderArticleForm(article) {
 
                 <label>Obsah článku</label>
                 <div id="quill-editor-container">${a.content}</div>
-                <textarea id="article-content-fallback" name="content" rows="22" style="display:none;">${esc(a.content)}</textarea>
+                <textarea id="article-content-fallback" name="content" rows="22" hidden>${esc(a.content)}</textarea>
                 <noscript><style>#quill-editor-container{display:none}#article-content-fallback{display:block!important}</style></noscript>
 
                 <p class="form-hint">Úryvek pro seznam článků a domovskou stránku se generuje automaticky z prvních vět obsahu.</p>
@@ -708,124 +588,23 @@ function renderArticleForm(article) {
                 </div>
             </form>
         </div>
-    </section>
-
-    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
-    <script>
-    (function () {
-        var container = document.getElementById('quill-editor-container');
-        var textarea = document.getElementById('article-content-fallback');
-        var form = document.getElementById('article-editor-form');
-        if (!container || !textarea || !form || typeof Quill === 'undefined') {
-            // Quill failed to load — show the raw textarea as fallback
-            if (textarea) textarea.style.display = '';
-            if (container) container.style.display = 'none';
-            return;
-        }
-
-        var quill = new Quill(container, {
-            theme: 'snow',
-            placeholder: 'Začněte psát obsah článku…',
-            modules: {
-                toolbar: [
-                    [{ header: [1, 2, 3, false] }],
-                    ['bold', 'italic'],
-                    ['blockquote'],
-                    [{ list: 'ordered' }, { list: 'bullet' }],
-                    ['link', 'image'],
-                    ['clean']
-                ]
-            }
-        });
-
-        // Custom image handler: upload to server instead of base64
-        function uploadAndInsert(file) {
-            var fd = new FormData();
-            fd.append('image', file);
-            fetch('/admin/article-image/upload', { method: 'POST', body: fd })
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    if (d.url) {
-                        var range = quill.getSelection(true);
-                        quill.insertEmbed(range.index, 'image', d.url);
-                        quill.setSelection(range.index + 1);
-                    } else {
-                        alert(d.error || 'Nahrávání selhalo');
-                    }
-                })
-                .catch(function () { alert('Chyba při nahrávání obrázku'); });
-        }
-
-        quill.getModule('toolbar').addHandler('image', function () {
-            var input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/jpeg,image/png,image/gif,image/webp';
-            input.onchange = function () {
-                if (input.files && input.files[0]) uploadAndInsert(input.files[0]);
-            };
-            input.click();
-        });
-
-        // Intercept pasted/dropped images — upload instead of embedding base64
-        quill.root.addEventListener('paste', function (e) {
-            var items = (e.clipboardData || {}).items;
-            if (!items) return;
-            for (var i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image/') === 0) {
-                    e.preventDefault();
-                    uploadAndInsert(items[i].getAsFile());
-                    return;
-                }
-            }
-        });
-
-        quill.root.addEventListener('drop', function (e) {
-            var files = (e.dataTransfer || {}).files;
-            if (!files || !files.length) return;
-            for (var i = 0; i < files.length; i++) {
-                if (files[i].type.indexOf('image/') === 0) {
-                    e.preventDefault();
-                    uploadAndInsert(files[i]);
-                    return;
-                }
-            }
-        });
-
-        // On form submit, sync Quill HTML into the hidden textarea
-        form.addEventListener('submit', function (e) {
-            var html = quill.getSemanticHTML();
-            // Quill returns <p><br></p> for empty content
-            if (html === '<p><br></p>' || html === '<p></p>' || !html.trim()) {
-                textarea.value = '';
-            } else {
-                textarea.value = html;
-            }
-            // Let the browser's required validation handle empty content
-            if (!textarea.value.trim()) {
-                e.preventDefault();
-                container.classList.add('quill-error');
-                container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                return false;
-            }
-            container.classList.remove('quill-error');
-        });
-
-        // Remove error highlight on typing
-        quill.on('text-change', function () {
-            container.classList.remove('quill-error');
-        });
-    })();
-    </script>`;
+    </section>`;
 }
 
+var articleEditorAssets = {
+    extraHead: '<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />',
+    extraScripts: '<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>',
+    scripts: ['/js/admin.js']
+};
+
 router.get('/clanek/new', requireAdminPage, function (req, res) {
-    res.send(layout('Nový článek', renderArticleForm(null), req));
+    res.send(adminLayout('Nový článek', renderArticleForm(null), req, articleEditorAssets));
 });
 
 router.get('/clanek/:slug/edit', requireAdminPage, function (req, res) {
     var article = getArticle(req.params.slug);
     if (!article) return res.redirect('/admin');
-    res.send(layout('Upravit článek', renderArticleForm(article), req));
+    res.send(adminLayout('Upravit článek', renderArticleForm(article), req, articleEditorAssets));
 });
 
 router.post('/clanek/save', requireAdmin, iconUpload.single('icon_file'), function (req, res) {
@@ -878,7 +657,7 @@ router.post('/clanek/save', requireAdmin, iconUpload.single('icon_file'), functi
                 .run(slug, title, meta, icon, content, isIntro, sortOrder);
         }
     } catch (e) {
-        return res.status(500).send(layout('Chyba',
+        return res.status(500).send(adminLayout('Chyba',
             '<section class="section"><div class="container container-narrow"><h1>Chyba při ukládání</h1><p>' + esc(e.message) + '</p><p><a href="/admin">← zpět</a></p></div></section>',
             req));
     }
