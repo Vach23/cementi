@@ -214,7 +214,18 @@ a:hover { text-decoration: underline; }
 .nav-hamburger span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 1px; }
 
 /* ── Modal ─────────────────────────────────────────────── */
-.modal { display: none; position: fixed; inset: 0; z-index: 2000; align-items: center; justify-content: center; }
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-y: auto;
+}
 .modal.active { display: flex; }
 .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
 .modal-content {
@@ -223,7 +234,7 @@ a:hover { text-decoration: underline; }
     border-radius: var(--radius-lg);
     padding: 40px;
     max-width: 380px;
-    width: 90%;
+    width: min(100%, 380px);
     box-shadow: var(--shadow-lg);
 }
 .modal-content h2 { font-family: var(--font-display); font-size: 24px; color: var(--blue-800); margin-bottom: 4px; }
@@ -1366,6 +1377,15 @@ footer {
     .comment-form textarea { font-size: 16px; /* prevent iOS zoom */ }
 
     /* ── Login modal on mobile ───────────────────────────── */
-    .modal-content { padding: 28px 20px; margin: 16px; }
+    .modal {
+        padding: 16px;
+        align-items: center;
+    }
+    .modal-content {
+        width: 100%;
+        max-width: 360px;
+        padding: 28px 20px;
+        margin: auto;
+    }
     .modal-content input { font-size: 16px; /* prevent iOS zoom */ }
 }

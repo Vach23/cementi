@@ -344,7 +344,7 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
 
             <div class="admin-section">
                 <div class="admin-section-header"><h2>Nahrát fotky</h2></div>
-                <form id="album-upload-form" enctype="multipart/form-data" class="admin-inline-form">
+                <form id="album-upload-form" method="POST" action="/admin/album/${esc(albumId)}/upload" enctype="multipart/form-data" class="admin-inline-form">
                     <input type="file" name="photos" id="album-upload-files" multiple accept="image/jpeg,image/png,image/gif,image/webp,video/mp4" required />
                     <button type="submit" class="btn btn-primary" id="album-upload-btn">Nahrát</button>
                 </form>
@@ -427,7 +427,7 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
         // Videos and small images pass through unchanged.
         function resizeImage(file) {
             return new Promise(function (resolve) {
-                if (!file.type.match(/^image\//)) return resolve(file);
+                if (file.type.indexOf('image/') !== 0) return resolve(file);
                 if (file.size < 500 * 1024) return resolve(file); // <500 KB — skip resize
 
                 var img = new Image();
@@ -496,7 +496,8 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
 
                 // Phase 2: upload with progress
                 var xhr = new XMLHttpRequest();
-                xhr.open('POST', '/admin/album/${esc(albumId)}/upload');
+                xhr.open('POST', form.action);
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
                 xhr.upload.addEventListener('progress', function (ev) {
                     if (!ev.lengthComputable) return;
@@ -539,14 +540,35 @@ router.get('/album/:id', requireAdminPage, function (req, res) {
     res.send(layout('Album – ' + album.title, body, req));
 });
 
-// JSON response — the admin page posts via fetch and reloads on success.
-router.post('/album/:id/upload', requireAdmin, photoUpload.array('photos', 100), async function (req, res) {
+function wantsJson(req) {
+    return req.get('X-Requested-With') === 'XMLHttpRequest'
+        || (req.get('Accept') || '').indexOf('application/json') !== -1;
+}
+
+function finishUpload(req, res, albumId, status, message) {
+    if (wantsJson(req)) return res.status(status).json(status >= 400 ? { error: message } : { message: message });
+    if (status >= 400) return res.status(status).send(layout('Chyba při nahrávání',
+        '<section class="section"><div class="container"><p>' + esc(message) + '</p><p><a href="/admin/album/' + esc(albumId) + '">Zpět na album</a></p></div></section>', req));
+    res.redirect('/admin/album/' + albumId);
+}
+
+router.post('/album/:id/upload', requireAdmin, function (req, res) {
     var albumId = req.params.id;
-    if (!safeAlbumId(albumId)) return res.status(400).json({ error: 'bad id' });
-    var files = req.files || [];
-    await Promise.all(files.map(function (f) { return generateResized(albumId, f.filename); }));
-    invalidateCache(albumId);
-    res.json({ message: 'Nahráno ' + files.length + ' souborů.' });
+    if (!safeAlbumId(albumId)) return finishUpload(req, res, albumId, 400, 'Neplatné ID alba.');
+
+    photoUpload.array('photos', 100)(req, res, function (err) {
+        if (err) return finishUpload(req, res, albumId, 400, err.message || 'Soubor se nepodařilo nahrát.');
+
+        var files = req.files || [];
+        Promise.all(files.map(function (f) { return generateResized(albumId, f.filename); }))
+            .then(function () {
+                invalidateCache(albumId);
+                finishUpload(req, res, albumId, 200, 'Nahráno ' + files.length + ' souborů.');
+            })
+            .catch(function (e) {
+                finishUpload(req, res, albumId, 500, e.message || 'Náhledy se nepodařilo vygenerovat.');
+            });
+    });
 });
 
 router.post('/album/:id/photo/delete', requireAdmin, function (req, res) {
