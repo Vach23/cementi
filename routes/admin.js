@@ -252,10 +252,10 @@ router.get('/', requireAdminPage, function (req, res) {
                     <h2>Uživatelé <span class="admin-count">${users.length}</span></h2>
                 </div>
 
-                <form method="POST" action="/admin/user/create" class="admin-inline-form">
-                    <input name="username" placeholder="Login" required />
-                    <input name="display_name" placeholder="Jméno" required />
-                    <input name="password" type="password" placeholder="Heslo" required />
+                <form method="POST" action="/admin/user/create" class="admin-inline-form" autocomplete="off">
+                    <input name="new_username" placeholder="Login" required autocomplete="off" autocapitalize="none" spellcheck="false" />
+                    <input name="display_name" placeholder="Jméno" required autocomplete="off" />
+                    <input name="new_user_password" type="password" placeholder="Heslo" required autocomplete="new-password" />
                     <label class="checkbox-label"><input type="checkbox" name="is_admin" value="1" /> Admin</label>
                     <button class="btn btn-primary">+ Přidat uživatele</button>
                 </form>
@@ -272,8 +272,8 @@ router.get('/', requireAdminPage, function (req, res) {
                                 '<button class="btn-sm btn-danger">Smazat</button>');
                         return '<tr>'
                             + '<td data-label="Login"><code>' + esc(u.username) + '</code></td>'
-                            + '<td data-label="Jméno"><input form="user-edit-' + u.id + '" name="display_name" value="' + esc(u.display_name) + '" required /></td>'
-                            + '<td data-label="Nové heslo"><input form="user-edit-' + u.id + '" name="password" type="password" placeholder="beze změny" /></td>'
+                            + '<td data-label="Jméno"><input form="user-edit-' + u.id + '" name="display_name" value="' + esc(u.display_name) + '" required autocomplete="off" /></td>'
+                            + '<td data-label="Nové heslo"><input form="user-edit-' + u.id + '" name="new_password" type="password" placeholder="beze změny" autocomplete="new-password" /></td>'
                             + '<td data-label="Admin"><label class="checkbox-label"><input form="user-edit-' + u.id + '" type="checkbox" name="is_admin" value="1"' + (u.is_admin ? ' checked' : '') + ' /> ✓</label></td>'
                             + '<td data-label="Komentářů">' + cc + '</td>'
                             + '<td data-label="Akce" class="admin-actions"><button form="user-edit-' + u.id + '" class="btn-sm">Uložit</button> ' + delBtn + '</td>'
@@ -281,7 +281,7 @@ router.get('/', requireAdminPage, function (req, res) {
                     }).join('')}</tbody>
                 </table>
                 ${users.map(function (u) {
-                    return '<form id="user-edit-' + u.id + '" method="POST" action="/admin/user/' + u.id + '/edit"></form>';
+                    return '<form id="user-edit-' + u.id + '" method="POST" action="/admin/user/' + u.id + '/edit" autocomplete="off"></form>';
                 }).join('')}
             </div>
         </div>
@@ -500,9 +500,9 @@ router.post('/album/:id/delete', requireAdmin, function (req, res) {
 
 // ── Users ──────────────────────────────────────────────────
 router.post('/user/create', requireAdmin, function (req, res) {
-    var u = (req.body.username || '').trim();
+    var u = (req.body.new_username || '').trim();
     var d = (req.body.display_name || '').trim();
-    var p = req.body.password || '';
+    var p = req.body.new_user_password || '';
     if (!u || !d || !p) return res.redirect('/admin');
     try {
         db.prepare('INSERT INTO users (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?)')
@@ -515,7 +515,7 @@ router.post('/user/:id/edit', requireAdmin, function (req, res) {
     var id = parseInt(req.params.id);
     if (!id) return res.redirect('/admin');
     var displayName = (req.body.display_name || '').trim();
-    var password = (req.body.password || '').trim();
+    var newPassword = req.body.new_password || '';
     var isAdmin = req.body.is_admin ? 1 : 0;
 
     // Prevent admin from stripping their own admin rights (would lock them out after session expires)
@@ -525,9 +525,9 @@ router.post('/user/:id/edit', requireAdmin, function (req, res) {
         db.prepare('UPDATE users SET display_name = ?, is_admin = ? WHERE id = ?')
             .run(displayName, isAdmin, id);
     }
-    if (password) {
+    if (newPassword) {
         db.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
-            .run(bcrypt.hashSync(password, 10), id);
+            .run(bcrypt.hashSync(newPassword, 10), id);
     }
     res.redirect('/admin');
 });
