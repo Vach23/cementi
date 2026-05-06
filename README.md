@@ -69,10 +69,6 @@ At `/admin` (requires admin login):
 
 The script rsyncs code and photos, installs dependencies, and restarts the PM2 process. The server runs behind nginx on port 3000.
 
-## Deployment (Windows)
-
-See [WINDOWS-MIGRATION.md](WINDOWS-MIGRATION.md) for a full guide on running with IIS + Windows Service.
-
 ## Project structure
 
 ```
@@ -86,4 +82,33 @@ public/foto/            Photos (gitignored)
 public/thumbs/          Thumbnails (gitignored)
 ```
 
-Full architecture details are in [CLAUDE.md](CLAUDE.md).
+## Development notes
+
+- Keep the app boring: no build step, framework, or TypeScript unless there is a concrete need.
+- Routes should depend on `lib/`, not on each other. `lib/db.js` owns the shared SQLite handle; `lib/helpers.js` should stay dependency-free.
+- CSS lives in `public/css/`, not inline in server templates.
+- Keep Czech text as UTF-8 with diacritics.
+- Never commit photo originals or generated image assets.
+- Article seed files in `data/articles/` are read only when the `articles` table is empty. After that, SQLite/admin UI is the source of truth.
+- `titulni_strana` is a system album used by the homepage slideshow/story photos.
+- Production runs behind nginx/HTTPS on port 3000. Nginx needs `client_max_body_size 100M` or large photo uploads will fail before reaching Node.
+
+## TODO
+
+Practical maintenance only. Keep this list short.
+
+- [ ] **Nightly SQLite backup**
+  `data/cementi.db` is the only persistent application state: users, comments, articles, and album metadata. Add a simple server-side cron backup with weekly rotation.
+
+- [ ] **Disable `X-Powered-By`**
+  Add `app.disable('x-powered-by')` in `server.js`. Small cleanup, no behavior change.
+
+- [ ] **Album folder metadata import**
+  Support optional `metadata.json` files inside `public/foto/<album>/` for initial album title, subtitle, sort order, description, and cover photo. Import them into SQLite during album sync; keep the database as the runtime source of truth and do not overwrite admin-edited fields.
+
+### Done / Removed
+
+- Admin sessions now expire after 12 hours instead of 30 days.
+- User/admin status is reloaded from SQLite on each request, so deleted or demoted users lose access.
+- Photo upload JavaScript was fixed, the upload form has a non-JS fallback, and updated photo assets get cache-busting URLs.
+- The old hardening backlog was trimmed. Persistent session storage, constant-time login, CSP work, comment rate limiting, audit logs, and similar items are unnecessary for this small private site right now.
