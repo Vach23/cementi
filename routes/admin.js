@@ -48,9 +48,10 @@ var removeThumb = photosLib.removeThumb;
 
 var getAlbums = albumsLib.getAlbums;
 var invalidateSync = albumsLib.invalidateSync;
+var isYearAlbum = albumsLib.isYearAlbum;
+var albumSubtitle = albumsLib.albumSubtitle;
 var getArticle = articlesLib.getArticle;
 var getArticles = articlesLib.getArticles;
-var albumMeta = photosLib.albumMeta;
 
 // Albums whose deletion would break the public site. Photos inside can still be managed normally.
 var PROTECTED_ALBUMS = { 'titulni_strana': true };
@@ -70,68 +71,61 @@ function sanitizeArticleHtml(html) {
     return sanitizeHtml(html, SANITIZE_OPTS);
 }
 
-function albumSubtitle(album) {
-    var meta = albumMeta[album.id] || {};
-    return album.subtitle || meta.subtitle || '';
+var ICON_DIR = path.join(__dirname, '..', 'public', 'obrazky', 'articles');
+fs.mkdirSync(ICON_DIR, { recursive: true });
+
+function uniqueUploadName(prefix, originalName, fallbackExt) {
+    var ext = path.extname(originalName).toLowerCase() || fallbackExt;
+    return prefix + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + ext;
 }
 
-// ── Upload storage (photos) ────────────────────────────────
-var photoStorage = multer.diskStorage({
+function makeUpload(opts) {
+    return multer({
+        storage: multer.diskStorage({
+            destination: opts.destination,
+            filename: function (req, file, cb) {
+                cb(null, uniqueUploadName(opts.prefix || '', file.originalname, opts.fallbackExt));
+            }
+        }),
+        fileFilter: function (req, file, cb) {
+            var ok = opts.accept(file.originalname);
+            cb(ok ? null : new Error(opts.errorMessage), ok);
+        },
+        limits: { fileSize: opts.limitMb * 1024 * 1024 }
+    });
+}
+
+var photoUpload = makeUpload({
+    prefix: '',
+    fallbackExt: '.jpg',
+    limitMb: 50,
+    errorMessage: 'Nepovolený typ',
+    accept: function (name) { return helpers.IMAGE_RE.test(name) || helpers.VIDEO_RE.test(name); },
     destination: function (req, file, cb) {
         var albumId = req.params.id;
         if (!albumId) return cb(new Error('album id missing'));
         var dir = path.join(FOTO_DIR, albumId);
         fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
-    },
-    filename: function (req, file, cb) {
-        var ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-        cb(null, Date.now() + '-' + Math.random().toString(36).slice(2, 8) + ext);
     }
-});
-var photoUpload = multer({
-    storage: photoStorage,
-    fileFilter: function (req, file, cb) {
-        if (helpers.IMAGE_RE.test(file.originalname) || helpers.VIDEO_RE.test(file.originalname)) cb(null, true);
-        else cb(new Error('Nepovolený typ'));
-    },
-    limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// ── Upload storage (article icons) ─────────────────────────
-var ICON_DIR = path.join(__dirname, '..', 'public', 'obrazky', 'articles');
-fs.mkdirSync(ICON_DIR, { recursive: true });
-var iconStorage = multer.diskStorage({
-    destination: function (req, file, cb) { cb(null, ICON_DIR); },
-    filename: function (req, file, cb) {
-        var ext = path.extname(file.originalname).toLowerCase() || '.img';
-        cb(null, 'icon-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + ext);
-    }
-});
-var iconUpload = multer({
-    storage: iconStorage,
-    fileFilter: function (req, file, cb) {
-        if (helpers.IMAGE_RE.test(file.originalname)) cb(null, true);
-        else cb(new Error('Neplatný typ obrázku'));
-    },
-    limits: { fileSize: 5 * 1024 * 1024 }
+var iconUpload = makeUpload({
+    prefix: 'icon-',
+    fallbackExt: '.img',
+    limitMb: 5,
+    errorMessage: 'Neplatný typ obrázku',
+    accept: function (name) { return helpers.IMAGE_RE.test(name); },
+    destination: function (req, file, cb) { cb(null, ICON_DIR); }
 });
 
-// ── Upload storage (article inline images) ────────────────
-var articleImageStorage = multer.diskStorage({
-    destination: function (req, file, cb) { cb(null, ICON_DIR); },
-    filename: function (req, file, cb) {
-        var ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-        cb(null, 'article-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + ext);
-    }
-});
-var articleImageUpload = multer({
-    storage: articleImageStorage,
-    fileFilter: function (req, file, cb) {
-        if (helpers.IMAGE_RE.test(file.originalname)) cb(null, true);
-        else cb(new Error('Neplatný typ obrázku'));
-    },
-    limits: { fileSize: 10 * 1024 * 1024 }
+var articleImageUpload = makeUpload({
+    prefix: 'article-',
+    fallbackExt: '.jpg',
+    limitMb: 10,
+    errorMessage: 'Neplatný typ obrázku',
+    accept: function (name) { return helpers.IMAGE_RE.test(name); },
+    destination: function (req, file, cb) { cb(null, ICON_DIR); }
 });
 
 function removeManagedIcon(iconPath) {
@@ -155,8 +149,8 @@ router.get('/', requireAdminPage, function (req, res) {
         .forEach(function (r) { commentCounts[r.user_id] = r.c; });
 
     // Group albums by where they appear on the public site.
-    var yearAlbums = albums.filter(function (a) { return /^\d{4}$/.test(a.id); });
-    var specialAlbums = albums.filter(function (a) { return !/^\d{4}$/.test(a.id) && !PROTECTED_ALBUMS[a.id]; });
+    var yearAlbums = albums.filter(isYearAlbum);
+    var specialAlbums = albums.filter(function (a) { return !isYearAlbum(a) && !PROTECTED_ALBUMS[a.id]; });
     var systemAlbums = albums.filter(function (a) { return PROTECTED_ALBUMS[a.id]; });
 
     function albumRow(a) {
@@ -295,7 +289,10 @@ router.post('/album/create', requireAdmin, function (req, res) {
     var title = (req.body.title || '').trim();
     if (!safeAlbumId(id) || !title) return res.redirect('/admin');
     fs.mkdirSync(path.join(FOTO_DIR, id), { recursive: true });
-    db.prepare('INSERT OR REPLACE INTO albums (id, title, subtitle, sort_order) VALUES (?, ?, ?, ?)')
+    db.prepare(`INSERT INTO albums (id, title, subtitle, sort_order) VALUES (?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET title = excluded.title,
+            subtitle = excluded.subtitle,
+            sort_order = excluded.sort_order`)
         .run(id, title, req.body.subtitle || '', parseInt(id) || 0);
     invalidateSync();
     res.redirect('/admin');
@@ -515,7 +512,7 @@ router.post('/user/:id/edit', requireAdmin, function (req, res) {
     var id = parseInt(req.params.id);
     if (!id) return res.redirect('/admin');
     var displayName = (req.body.display_name || '').trim();
-    var newPassword = req.body.new_password || '';
+    var newPassword = (req.body.new_password || '').trim();
     var isAdmin = req.body.is_admin ? 1 : 0;
 
     // Prevent admin from stripping their own admin rights (would lock them out after session expires)

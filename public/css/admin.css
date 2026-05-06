@@ -51,8 +51,7 @@
     border-radius: var(--radius);
     border: 1px dashed var(--paper-dark);
 }
-.admin-inline-form input,
-.admin-inline-form select {
+.admin-inline-form :is(input, select) {
     padding: 8px 12px;
     border: 2px solid var(--paper-dark);
     border-radius: 6px;
@@ -63,7 +62,7 @@
 }
 .admin-inline-form-stacked { flex-direction: column; align-items: stretch; }
 .admin-inline-form-stacked input { flex: none; width: 100%; }
-.admin-inline-form input:focus, .admin-inline-form select:focus { outline: none; border-color: var(--blue-500); }
+.admin-inline-form :is(input, select):focus { outline: none; border-color: var(--blue-500); }
 .admin-inline-form .checkbox-label { flex: none; }
 .admin-inline-form button { flex: none; }
 .admin-actions-note { color: var(--text-muted); font-size: 12px; font-style: italic; }
@@ -101,10 +100,7 @@
     margin-top: 14px;
 }
 .article-form label code { font-family: monospace; font-weight: normal; font-size: 12px; background: var(--paper-dark); padding: 1px 5px; border-radius: 3px; }
-.article-form input[type="text"],
-.article-form input:not([type]),
-.article-form input[type="number"],
-.article-form textarea {
+.article-form :is(input[type="text"], input:not([type]), input[type="number"], textarea) {
     padding: 10px 14px;
     border: 2px solid var(--paper-dark);
     border-radius: var(--radius);
@@ -203,22 +199,16 @@
     background: var(--paper);
     font-family: var(--font-body);
 }
-.article-form .ql-toolbar.ql-snow .ql-picker-label,
-.article-form .ql-toolbar.ql-snow button {
+.article-form .ql-toolbar.ql-snow :is(.ql-picker-label, button) {
     color: var(--text-light);
 }
-.article-form .ql-toolbar.ql-snow button:hover,
-.article-form .ql-toolbar.ql-snow button.ql-active,
-.article-form .ql-toolbar.ql-snow .ql-picker-label:hover,
-.article-form .ql-toolbar.ql-snow .ql-picker-label.ql-active {
+.article-form .ql-toolbar.ql-snow :is(button, .ql-picker-label):is(:hover, .ql-active) {
     color: var(--blue-600);
 }
-.article-form .ql-toolbar.ql-snow button:hover .ql-stroke,
-.article-form .ql-toolbar.ql-snow button.ql-active .ql-stroke {
+.article-form .ql-toolbar.ql-snow button:is(:hover, .ql-active) .ql-stroke {
     stroke: var(--blue-600);
 }
-.article-form .ql-toolbar.ql-snow button:hover .ql-fill,
-.article-form .ql-toolbar.ql-snow button.ql-active .ql-fill {
+.article-form .ql-toolbar.ql-snow button:is(:hover, .ql-active) .ql-fill {
     fill: var(--blue-600);
 }
 .article-form .ql-snow .ql-tooltip {
@@ -234,8 +224,7 @@
     font-size: 13px;
     font-family: var(--font-body);
 }
-.article-form .ql-snow .ql-tooltip a.ql-action,
-.article-form .ql-snow .ql-tooltip a.ql-remove {
+.article-form .ql-snow .ql-tooltip a:is(.ql-action, .ql-remove) {
     color: var(--blue-600);
 }
 
@@ -405,8 +394,7 @@
         padding: 12px;
         gap: 10px;
     }
-    .admin-inline-form input,
-    .admin-inline-form select {
+    .admin-inline-form :is(input, select) {
         flex: none;
         width: 100%;
         font-size: 16px;
@@ -448,9 +436,7 @@
         flex-shrink: 0;
         min-width: 80px;
     }
-    .admin-table td input[type="text"],
-    .admin-table td input:not([type]),
-    .admin-table td input[type="password"] {
+    .admin-table td :is(input[type="text"], input:not([type]), input[type="password"]) {
         flex: 1;
         min-width: 0;
         width: auto;
@@ -481,9 +467,7 @@
 
     .article-form { padding: 14px; }
     .article-form label { margin-top: 10px; }
-    .article-form input[type="text"],
-    .article-form input:not([type]),
-    .article-form input[type="number"] {
+    .article-form :is(input[type="text"], input:not([type]), input[type="number"]) {
         font-size: 16px;
     }
     #quill-editor-container { min-height: 220px; }

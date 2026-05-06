@@ -10,6 +10,9 @@ Practical maintenance only. Keep this list short.
 - [ ] **Disable `X-Powered-By`**
   Add `app.disable('x-powered-by')` in `server.js`. Small cleanup, no behavior change.
 
+- [ ] **Album folder metadata import**
+  Support optional `metadata.json` files inside `public/foto/<album>/` for initial album title, subtitle, sort order, description, and cover photo. Import them into SQLite during album sync; keep the database as the runtime source of truth and do not overwrite admin-edited fields.
+
 ## Done / Removed
 
 - Admin sessions now expire after 12 hours instead of 30 days.

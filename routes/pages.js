@@ -17,32 +17,27 @@ var photoCountText = helpers.photoCountText;
 var layout = layoutLib.layout;
 
 var getPhotos = photosLib.getPhotos;
-var getVideos = photosLib.getVideos;
 var getThumbSet = photosLib.getThumbSet;
 var getDisplaySet = photosLib.getDisplaySet;
 var thumbPath = photosLib.thumbPath;
 var displayPath = photosLib.displayPath;
-var getCoverPhoto = photosLib.getCoverPhoto;
-var albumMeta = photosLib.albumMeta;
 
 var getAlbums = albumsLib.getAlbums;
+var isYearAlbum = albumsLib.isYearAlbum;
+var albumView = albumsLib.albumView;
+var albumViews = albumsLib.albumViews;
 var getArticle = articlesLib.getArticle;
 var getArticles = articlesLib.getArticles;
 
 var router = express.Router();
 
-function albumSubtitle(album) {
-    var meta = albumMeta[album.id] || {};
-    return album.subtitle || meta.subtitle || '';
-}
-
 router.get('/', function (req, res) {
-    var albums = getAlbums();
-    var yearAlbums = albums.filter(function (a) { return /^\d{4}$/.test(a.id) && getPhotos(a.id).length > 0; });
-    var totalPhotos = 0;
-    albums.forEach(function (a) { totalPhotos += getPhotos(a.id).length; });
+    var albums = albumViews(getAlbums());
+    var yearAlbums = albums.filter(function (v) { return isYearAlbum(v.album) && v.photoCount > 0; });
+    var totalPhotos = albums.reduce(function (sum, v) { return sum + v.photoCount; }, 0);
 
-    var heroPhotos = getPhotos('titulni_strana');
+    var heroView = albums.find(function (v) { return v.album.id === 'titulni_strana'; });
+    var heroPhotos = heroView ? heroView.photos : getPhotos('titulni_strana');
     var heroDisplaySet = getDisplaySet('titulni_strana');
     var heroImages = heroPhotos.map(function (f) { return displayPath('titulni_strana', f, heroDisplaySet); });
     var heroImagesJson = JSON.stringify(heroImages).replace(/'/g, '&apos;');
@@ -88,17 +83,15 @@ router.get('/', function (req, res) {
         <div class="container">
             <h2 class="section-title section-title-light">Cementárny v průběhu let</h2>
             <div class="album-board">
-                ${yearAlbums.map(function (a) {
-                    var count = getPhotos(a.id).length;
-                    var cover = getCoverPhoto(a);
-                    var sub = albumSubtitle(a);
+                ${yearAlbums.map(function (v) {
+                    var a = v.album;
                     return `<a href="/galerie/${a.id}" class="board-card">
-                        <div class="board-card-img" style="background-image:url('${cover}')">
-                            <span class="board-card-count">${count}</span>
+                        <div class="board-card-img" style="background-image:url('${v.cover}')">
+                            <span class="board-card-count">${v.photoCount}</span>
                         </div>
                         <div class="board-card-body">
                             <strong>${esc(a.title)}</strong>
-                            ${sub ? '<small>' + esc(sub) + '</small>' : ''}
+                            ${v.subtitle ? '<small>' + esc(v.subtitle) + '</small>' : ''}
                         </div>
                     </a>`;
                 }).join('')}
@@ -140,27 +133,25 @@ router.get('/', function (req, res) {
 });
 
 router.get('/cas', function (req, res) {
-    var albums = getAlbums();
-    var yearAlbums = albums.filter(function (a) { return /^\d{4}$/.test(a.id) && getPhotos(a.id).length > 0; });
-    var specialAlbums = albums.filter(function (a) {
-        return !/^\d{4}$/.test(a.id) && a.id !== 'titulni_strana' && getPhotos(a.id).length > 0;
+    var albums = albumViews(getAlbums());
+    var yearAlbums = albums.filter(function (v) { return isYearAlbum(v.album) && v.photoCount > 0; });
+    var specialAlbums = albums.filter(function (v) {
+        return !isYearAlbum(v.album) && v.album.id !== 'titulni_strana' && v.photoCount > 0;
     });
 
-    var timelineHtml = yearAlbums.map(function (a) {
-        var photos = getPhotos(a.id);
-        var cover = getCoverPhoto(a);
-        var sub = albumSubtitle(a);
+    var timelineHtml = yearAlbums.map(function (v) {
+        var a = v.album;
         var thumbSet = getThumbSet(a.id);
-        var previewPhotos = photos.slice(0, 4).map(function (f) { return thumbPath(a.id, f, thumbSet); });
+        var previewPhotos = v.photos.slice(0, 4).map(function (f) { return thumbPath(a.id, f, thumbSet); });
 
         return `<div class="tl-item">
             <div class="tl-marker"><span>${esc(a.id)}</span></div>
             <a href="/galerie/${a.id}" class="tl-card">
-                <div class="tl-card-cover" style="background-image:url('${cover}')"></div>
+                <div class="tl-card-cover" style="background-image:url('${v.cover}')"></div>
                 <div class="tl-card-body">
                     <h3>${esc(a.title)}</h3>
-                    ${sub ? '<p class="tl-card-sub">' + esc(sub) + '</p>' : ''}
-                    <p class="tl-card-count">${photoCountText(photos.length)}</p>
+                    ${v.subtitle ? '<p class="tl-card-sub">' + esc(v.subtitle) + '</p>' : ''}
+                    <p class="tl-card-count">${photoCountText(v.photoCount)}</p>
                     <div class="tl-card-previews">
                         ${previewPhotos.map(function (src) {
                             return '<img src="' + src + '" alt="" loading="lazy" />';
@@ -171,15 +162,13 @@ router.get('/cas', function (req, res) {
         </div>`;
     }).join('');
 
-    var specialHtml = specialAlbums.map(function (a) {
-        var count = getPhotos(a.id).length;
-        var cover = getCoverPhoto(a);
-        var sub = albumSubtitle(a);
+    var specialHtml = specialAlbums.map(function (v) {
+        var a = v.album;
         return `<a href="/galerie/${a.id}" class="special-album-card">
-            <div class="special-album-cover" style="background-image:url('${cover}')"></div>
+            <div class="special-album-cover" style="background-image:url('${v.cover}')"></div>
             <div class="special-album-body">
-                <h3>${esc(sub || a.title)}</h3>
-                <span>${photoCountText(count)}</span>
+                <h3>${esc(v.subtitle || a.title)}</h3>
+                <span>${photoCountText(v.photoCount)}</span>
             </div>
         </a>`;
     }).join('');
@@ -220,9 +209,9 @@ router.get('/galerie/:album', function (req, res) {
     var album = db.prepare('SELECT * FROM albums WHERE id = ?').get(albumId);
     if (!album) return res.status(404).send(layout('Nenalezeno', '<section class="section"><div class="container"><h1>Album nenalezeno</h1></div></section>', req));
 
-    var photos = getPhotos(albumId);
-    var videos = getVideos(albumId);
-    var subtitle = albumSubtitle(album);
+    var view = albumView(album, { includeVideos: true });
+    var photos = view.photos;
+    var videos = view.videos;
 
     var page = parseInt(req.query.s) || 1;
     var perPage = 36;
@@ -244,7 +233,7 @@ router.get('/galerie/:album', function (req, res) {
         return '<div class="video-wrap"><video controls preload="metadata"><source src="/foto/' + esc(albumId) + '/' + esc(v) + '" /></video></div>';
     }).join('');
 
-    var allAlbums = getAlbums().filter(function (a) { return /^\d{4}$/.test(a.id); });
+    var allAlbums = getAlbums().filter(isYearAlbum);
     var idx = allAlbums.findIndex(function (a) { return a.id === albumId; });
     var prevAlbum = idx < allAlbums.length - 1 ? allAlbums[idx + 1] : null;
     var nextAlbum = idx > 0 ? allAlbums[idx - 1] : null;
@@ -253,11 +242,11 @@ router.get('/galerie/:album', function (req, res) {
     var dispSet = getDisplaySet(albumId);
 
     var body = `
-    <section class="gallery-header" style="background-image:url('${getCoverPhoto(album)}')">
+    <section class="gallery-header" style="background-image:url('${view.cover}')">
         <div class="gallery-header-overlay"></div>
         <div class="gallery-header-content">
             <h1>${esc(album.title)}</h1>
-            ${subtitle ? '<p>' + esc(subtitle) + '</p>' : ''}
+            ${view.subtitle ? '<p>' + esc(view.subtitle) + '</p>' : ''}
             <span class="gallery-stat">${photoCountText(photos.length)}${videos.length ? ' · ' + videos.length + ' videí' : ''}</span>
         </div>
     </section>

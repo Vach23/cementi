@@ -207,11 +207,12 @@
         setInterval(function () {
             if (nextPoolIdx >= pool.length) nextPoolIdx = 0;
             var slot = slots[slotToReplace];
+            var photoIdx = nextPoolIdx;
             var newSrc = pool[nextPoolIdx];
             slot.style.opacity = '0';
             setTimeout(function () {
                 slot.src = newSrc;
-                slot.setAttribute('data-photo-index', nextPoolIdx);
+                slot.setAttribute('data-photo-index', photoIdx);
                 slot.style.opacity = '1';
             }, 600);
             nextPoolIdx++;

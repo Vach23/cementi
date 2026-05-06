@@ -449,19 +449,24 @@ a:hover { text-decoration: underline; }
     grid-template-columns: 1fr 1fr;
     gap: 20px;
 }
-.article-card {
+.article-card,
+.article-list-item {
     display: flex;
-    gap: 16px;
-    padding: 24px;
     background: #fff;
     border-radius: var(--radius-lg);
-    border: 1px solid rgba(0,0,0,0.06);
-    transition: box-shadow var(--transition), transform var(--transition);
     text-decoration: none;
     color: var(--text);
 }
+.article-card {
+    gap: 16px;
+    padding: 24px;
+    border: 1px solid rgba(0,0,0,0.06);
+    transition: box-shadow var(--transition), transform var(--transition);
+}
 .article-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); text-decoration: none; }
-.article-card-icon img { width: 80px; height: 80px; object-fit: contain; flex-shrink: 0; }
+.article-card-icon img,
+.article-list-item img { object-fit: contain; flex-shrink: 0; }
+.article-card-icon img { width: 80px; height: 80px; }
 .article-card h3 { font-family: var(--font-display); font-size: 18px; color: var(--blue-800); margin-bottom: 6px; }
 .article-card p { font-size: 14px; color: var(--text-light); line-height: 1.5; }
 
@@ -645,20 +650,15 @@ a:hover { text-decoration: underline; }
 
 /* ── Articles ──────────────────────────────────────────── */
 .article-list-item {
-    display: flex;
     gap: 20px;
     padding: 24px;
-    background: #fff;
-    border-radius: var(--radius-lg);
     margin-bottom: 16px;
     box-shadow: var(--shadow);
     transition: box-shadow var(--transition);
-    text-decoration: none;
-    color: var(--text);
     align-items: center;
 }
 .article-list-item:hover { box-shadow: var(--shadow-lg); text-decoration: none; }
-.article-list-item img { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
+.article-list-item img { width: 64px; height: 64px; }
 .article-list-item h3 { font-family: var(--font-display); font-size: 20px; color: var(--blue-800); margin-bottom: 4px; }
 .article-list-item p { font-size: 14px; color: var(--text-light); }
 .article-list-meta { font-size: 12px !important; text-transform: uppercase; letter-spacing: 1.5px; color: var(--amber-600) !important; margin-bottom: 4px; }
@@ -793,9 +793,6 @@ footer {
     padding: 30px 0;
 }
 .footer-inner {
-    max-width: 1140px;
-    margin: 0 auto;
-    padding: 0 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;

@@ -29,7 +29,12 @@ app.use(session({
     secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: SESSION_MAX_AGE, sameSite: 'lax', httpOnly: true, secure: true }
+    cookie: {
+        maxAge: SESSION_MAX_AGE,
+        sameSite: 'lax',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production'
+    }
 }));
 app.use(function (req, res, next) {
     if (!req.session.userId) return next();
