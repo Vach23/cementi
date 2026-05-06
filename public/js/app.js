@@ -18,13 +18,11 @@
     // ── Navigation + modal ────────────────────────────────
     function initNav() {
         var toggle = document.querySelector('[data-nav-toggle]');
-        var links = document.getElementById('nav-links');
-        var auth = document.getElementById('nav-auth');
-        if (toggle && links && auth) {
+        var menu = document.getElementById('nav-menu');
+        if (toggle && menu) {
             toggle.addEventListener('click', function () {
-                var open = !links.classList.contains('open');
-                links.classList.toggle('open', open);
-                auth.classList.toggle('open', open);
+                var open = !menu.classList.contains('open');
+                menu.classList.toggle('open', open);
                 toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
                 toggle.setAttribute('aria-label', open ? 'Zavřít menu' : 'Otevřít menu');
             });
